@@ -34,8 +34,16 @@
     [{} {}]
     words))
 
+(defn run-macro [word macros]
+  (reduce (fn [acc token]
+    (into acc (get macros token [token])))
+    []
+    word))
+
 (defn run-macros [words]
-  (split-words (strip-comments words)))
+  (let [[words macros] (split-words (strip-comments words))]
+    (map (fn [[k v]]
+      [k (run-macro v macros)]) words)))
 
 (defn -main [& args]
-  (run-macros (wordify (tokenize ": someword ( foo bar ) baz :m test ( a b ) a b + ; hax ;\n5 6 test"))))
+  (run-macros (wordify (tokenize ": someword ( foo bar ) baz :m test + ; :m add-five 5 + ; hax ;\n1 add-five 6 test"))))
