@@ -9,10 +9,11 @@
   [code]
   (clojure.string/split code #"\s+"))
 
+(defn update [map key func data] (update-in map [key] (fnil func []) data))
+
 (defn wordify
   "Convert a vector of tokens into a map of words to vector of tokens"
   [tokens]
-  (defn update [m k f d] (update-in m [k] (fnil f []) d))
   (first
     (reduce
       (fn [[words macros cur-word cur-type stack] token]
