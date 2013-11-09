@@ -1,49 +1,41 @@
 (ns jaderforth.core
+  (:use [clojure.core.match :only [match]])
   (:gen-class))
 
-(use '[clojure.core.match :only (match)])
+(def default-input ": someword ( foo bar ) baz :m test + ; :m add-five 5 + ; hax ;\n1 add-five 6 test")
 
-(defn vec-list [vec] (reverse (into () vec)))
+(defn tokenize
+  "Split code into tokens. A token is any whitespace-separated collection of characters"
+  [code]
+  (clojure.string/split code #"\s+"))
 
-(defn tokenize [code]
-  (vec-list (clojure.string/split code #"\s+")))
+(defn wordify
+  "Convert a vector of tokens into a map of words to vector of tokens"
+  [tokens]
+  (first
+    (reduce
+      (fn [[words macros cur-word cur-type stack] token]
+        (match [token]
+          [":" ]  [words macros nil :func  (conj stack [cur-word cur-type])]
+          [":m"]  [words macros nil :macro (conj stack [cur-word cur-type])]
+          [";" ]  (let [[word type] (last stack)]
+                    [words macros word type (pop stack)])
+          :else   (if cur-word
+                    (match [cur-type]
+                      [:func ]  (let [macro?  (contains? macros token)
+                                      updater (if macro? (comp vec concat) conj)
+                                      data    (if macro? (macros token) token)]
+                                  [(update-in words [cur-word] (fnil updater []) data) macros cur-word cur-type stack])
+                      [:macro]  [words (update-in macros [cur-word] (fnil conj []) token) cur-word cur-type stack])
+                    [words macros token cur-type stack])))
+      [{} {} "main" :func []]
+      tokens)))
 
-(defn wordify [code]
-  (defn sub [code words word-stack comment-depth]
-    (defn append-token [word token]
-      (assoc words word (conj (get words word []) token)))
-
-    (match [comment-depth (first code)]
-      [0 ":"]   (recur (rest (rest code)) (append-token (nth code 1) :word) (cons (nth code 1) word-stack) 0)
-      [0 ":m"]  (recur (rest (rest code)) (append-token (nth code 1) :macro) (cons (nth code 1) word-stack) 0)
-      [0 ";"]   (recur (rest code) words (rest word-stack) 0)
-      [_ "("]   (recur (rest code) (append-token (first word-stack) "(") word-stack (+ comment-depth 1))
-      [_ ")"]   (recur (rest code) (append-token (first word-stack) ")") word-stack (- comment-depth 1))
-      [_ nil]   words
-      :else (recur (rest code) (append-token (first word-stack) (first code)) word-stack 0)))
-  (sub code {"main" [:word]} '("main") 0))
-
-(defn strip-comments [words] words)
-
-(defn split-words [words]
-  (reduce
-    (fn [[words macros] [k v]]
-      (match v
-        [:word & r] [(assoc words k r) macros]
-        [:macro & r] [words (assoc macros k r)]))
-    [{} {}]
-    words))
-
-(defn run-macro [word macros]
-  (reduce (fn [acc token]
-    (into acc (get macros token [token])))
-    []
-    word))
-
-(defn run-macros [words]
-  (let [[words macros] (split-words (strip-comments words))]
-    (map (fn [[k v]]
-      [k (run-macro v macros)]) words)))
-
+(defn parse
+  "Convert code into map of words to macro-expanded vector of tokens"
+  [code]
+  (wordify (tokenize code)))
+  
 (defn -main [& args]
-  (run-macros (wordify (tokenize ": someword ( foo bar ) baz :m test + ; :m add-five 5 + ; hax ;\n1 add-five 6 test"))))
+  (parse (or (first args) default-input)))
+
