@@ -12,6 +12,7 @@
 (defn wordify
   "Convert a vector of tokens into a map of words to vector of tokens"
   [tokens]
+  (defn update [m k f d] (update-in m [k] (fnil f []) d))
   (first
     (reduce
       (fn [[words macros cur-word cur-type stack] token]
@@ -25,8 +26,8 @@
                       [:func ]  (let [[updater data]  (if (contains? macros token)
                                                         [(comp vec concat) (macros token)]
                                                         [conj token])]
-                                  [(update-in words [cur-word] (fnil updater []) data) macros cur-word cur-type stack])
-                      [:macro]  [words (update-in macros [cur-word] (fnil conj []) token) cur-word cur-type stack])
+                                  [(update words cur-word updater data) macros cur-word cur-type stack])
+                      [:macro]  [words (update macros cur-word conj token) cur-word cur-type stack])
                     [words macros token cur-type stack])))
       [{} {} "main" :func []]
       tokens)))
