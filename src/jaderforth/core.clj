@@ -22,9 +22,10 @@
                     [words macros word type (pop stack)])
           :else   (if cur-word
                     (match [cur-type]
-                      [:func ]  (let [macro?  (contains? macros token)
-                                      updater (if macro? (comp vec concat) conj)
-                                      data    (if macro? (macros token) token)]
+                      [:func ]  (let [macro?          (contains? macros token)
+                                      [updater data]  (if macro?
+                                                        [(comp vec concat) (macros token)]
+                                                        [conj token])]
                                   [(update-in words [cur-word] (fnil updater []) data) macros cur-word cur-type stack])
                       [:macro]  [words (update-in macros [cur-word] (fnil conj []) token) cur-word cur-type stack])
                     [words macros token cur-type stack])))
